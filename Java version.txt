@@ -1,0 +1,2 @@
+java spring boot: phiên bản 3.5 (để ổn định)
+Java JDK: phiên bản v21

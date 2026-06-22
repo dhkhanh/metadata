@@ -1,0 +1,96 @@
+Luồng metadata-service
+
+API (FormController.java) - api/ui/FormController
+ ↓
+APPLICATION (FormCommandService, chỉ biết domain.ui.repository.FormRepository)
+ ↓
+DOMAIN (FormRepository.java) - interface
+ ↑
+INFRASTRUCTURE ADAPTER (FormRepositoryImpl.java)
+ ↑
+SPRING DATA JPA (FormDefinitionJpaRepository.java)
+ ↑
+DATABASE
+
+Giải thích:
+- api chỉ nhận HTTP request, gọi Application.
+- application điều phối use case.
+- domain chứa nghiệp vụ, không biết Spring, JPA, REST.
+- infrastructure triển khai các interface mà Domain khai báo.
+
+
+=============================================================================================================================================================
+Domain Repository 
+        ↑ implements
+RepositoryImpl
+        ↓ sử dụng
+Spring Data Repository
+        ↓
+JpaEntity
+
+
+Quan hệ Metadata UI
+ScreenDefinition
+│
+├── FormDefinition
+│       ↓
+│   Dynamic Form
+│
+└── ViewDefinition
+        ↓
+    Dynamic Table
+
+Luồng React ERP:
+    React ERP
+        ↓
+    GET /api/metadata/screens/{id}
+        ↓
+    ScreenDefinition
+        ↓
+    components
+        ↓
+    FormDefinition
+        ↓
+    ViewDefinition
+        ↓
+    Render Dynamic UI
+
+
+Screen
+   ↓
+ScreenDefinition
+   ↓
+ScreenComponent
+   ↓
+FORM -> FormDefinition
+VIEW -> ViewDefinition
+   ↓
+Render Dynamic UI
+
+=======================================================================================
+Luồng thực tế khi tạo Form:
+
+	POST /api/metadata/forms
+	        |
+	        v
+     FormController
+	        |
+	        v
+	FormCommandService
+	        |
+	        v
+	  FormRepository
+	        |
+	        v
+   FormRepositoryImpl
+	        |
+	        v
+ FormDefinitionJpaRepository
+	        |
+	        v
+		Hibernate
+	        |
+	        v
+		PostgreSQL
+
+

@@ -1,0 +1,528 @@
+// metadata-service
+// Quản lý trường động (tức là bổ sung thêm trường vào 1 bảng core, nếu cần bổ sung)
+
+
+1. Bảng entity_definition: 
+- Đối tượng nghiệp vụ (Business Entity). Đây là bảng gốc để AI, Form Builder, CRUD Engine biết hệ thống có những đối tượng nào.
+- Generic CRUD + EntityManager + Metadata Registry
+Ví dụ:
+	employee
+	customer
+	vendor
+	product
+	document
+	voucher
+
+CREATE TABLE entity_definition (
+    id UUID PRIMARY KEY,
+    entity_code VARCHAR(100) NOT NULL UNIQUE,
+    entity_name VARCHAR(255) NOT NULL,
+    entity_class VARCHAR(500) NOT NULL,
+    service_name VARCHAR(100) NOT NULL,
+    schema_name VARCHAR(100),
+    table_name VARCHAR(100) NOT NULL,
+    primary_key_field VARCHAR(100) NOT NULL DEFAULT 'id',
+    primary_key_type VARCHAR(50) NOT NULL DEFAULT 'UUID',
+    display_name_field VARCHAR(100),
+    soft_delete BOOLEAN DEFAULT TRUE,
+    tenant_enabled BOOLEAN DEFAULT FALSE,
+    auditable BOOLEAN DEFAULT TRUE,
+    cacheable BOOLEAN DEFAULT FALSE,
+    api_path VARCHAR(255),
+    description TEXT,
+    active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+Dữ liệu mẫu:
+entity_code		entity_name		service_name		table_name
+===========		===========		==================	===========
+employee		Nhân viên		hrm-service			employee
+customer		Khách hàng		accounting-service	customer
+document		Văn bản			document-service	document
+product			Hàng hóa		inventory-service	product
+
+Ý nghĩa các trường
+Trường				Ý nghĩa
+==============		======================
+entity_code			Mã kỹ thuật
+entity_name			Tên hiển thị
+service_name		Service sở hữu
+table_name			Bảng dữ liệu chính
+active				Đang sử dụng hay không
+
+
+entity_class: Đây là trường quan trọng nhất.
+Ví dụ:
+entity_code		entity_class
+employee		com.erp.hrm.entity.Employee
+customer		com.erp.accounting.entity.Customer
+vendor			com.erp.accounting.entity.Vendor
+
+Data Registry:
+Class<?> clazz =
+    Class.forName(entityClass);
+
+schema_name: Nếu dùng PostgreSQL hoặc Oracle.
+Ví dụ:
+	schema_name
+	hrm
+	accounting
+	document
+
+primary_key_field: Không phải bảng nào cũng dùng:
+
+id
+
+Ví dụ:
+	employee_id
+	customer_id
+	document_id
+
+nếu có trường này Generic CRUD sẽ linh hoạt hơn.
+
+primary_key_type
+
+Ví dụ:
+	UUID
+	LONG
+	STRING
+
+DataService sẽ biết convert id.
+
+display_name_field: Dùng cho dropdown, lookup, AI.
+Ví dụ:
+	employee -> full_name
+	customer -> customer_name
+	product -> product_name
+	soft_delete
+
+Cho biết entity có dùng: deleted hay không.
+
+DataService tự động xử lý:
+
+WHERE deleted = false
+tenant_enabled
+
+Nếu ERP SaaS nhiều khách hàng.
+
+Ví dụ:
+
+tenant_id
+auditable
+
+Cho biết có ghi:
+
+created_by
+created_date
+updated_by
+updated_date
+
+hay không.
+
+cacheable
+
+Cho Master Data.
+
+Ví dụ:
+
+Department
+Position
+Currency
+Unit
+api_path
+
+Ví dụ:
+
+/api/data/employee
+/api/data/customer
+
+AI Agent có thể tự sinh API.
+
+
+
+
+2. field_definition
+- Ý nghĩa / Định nghĩa: Core Field hay còn gọi: Trường chuẩn của hệ thống
+- Ví dụ Employee:
+employee_code
+	full_name
+	department_id
+	position_id
+Customer:
+	customer_code
+	name
+	tax_code
+
+CREATE TABLE field_definition (
+    id UUID PRIMARY KEY,
+    entity_code VARCHAR(100) NOT NULL,
+    field_name VARCHAR(100) NOT NULL,
+    field_label VARCHAR(255) NOT NULL,
+    data_type VARCHAR(50) NOT NULL,
+    required BOOLEAN DEFAULT FALSE,
+    unique_field BOOLEAN DEFAULT FALSE,
+    searchable BOOLEAN DEFAULT TRUE,
+    sortable BOOLEAN DEFAULT TRUE,
+    visible BOOLEAN DEFAULT TRUE,
+    display_order INTEGER DEFAULT 0,
+    description TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+Dữ liệu mẫu
+entity_code		field_name		field_label		data_type
+===========		=============	=============	==========
+employee		employee_code	Mã nhân viên	TEXT
+employee		full_name		Họ tên			TEXT
+employee		department_id	Phòng ban		UUID
+employee		birth_date		Ngày sinh		DATE
+
+Ý nghĩa các trường:
+Trường				Ý nghĩa
+==============		========================
+field_name			Tên cột
+field_label			Nhãn UI
+data_type			TEXT, NUMBER, DATE...
+required			Bắt buộc
+unique_field		Không trùng
+searchable			Cho phép tìm kiếm
+sortable			Cho phép sắp xếp
+visible				Hiển thị UI
+
+3. entity_custom_field
+- Ý nghĩa/Định nghĩa: Trường mở rộng do người dùng tự thêm
+- Ví dụ:
+	Nhân sự muốn thêm:
+		Mã BHXH
+		CCCD
+		Facebook
+		Zalo
+	=> Không sửa code.
+	=> Không sửa DB.
+	=> Chỉ thêm metadata.
+
+CREATE TABLE entity_custom_field (
+    id UUID PRIMARY KEY,
+    entity_code VARCHAR(100) NOT NULL,
+    field_code VARCHAR(100) NOT NULL,
+    field_label VARCHAR(255) NOT NULL,
+    data_type VARCHAR(50) NOT NULL,
+    required BOOLEAN DEFAULT FALSE,
+    searchable BOOLEAN DEFAULT FALSE,
+    visible BOOLEAN DEFAULT TRUE,
+    default_value TEXT,
+    display_order INTEGER DEFAULT 0,
+    description TEXT,
+    active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+Dữ liệu mẫu
+entity_code		field_code		field_label
+===========		===========		===========
+employee		bhxh			Mã BHXH
+employee		cccd			Số CCCD
+employee		zalo			Zalo
+customer		customer_level	Hạng khách hàng
+product			manufacturer	Nhà sản xuất
+
+Ý nghĩa các trường:
+Trường				Ý nghĩa
+==============		==================
+field_code			Mã trường
+field_label			Tên hiển thị
+data_type			TEXT, NUMBER, DATE
+default_value		Giá trị mặc định
+active				Đang sử dụng
+
+4. Ý nghĩa các bảng
+- form_definition: Định nghĩa cấu trúc form nhập liệu (ví dụ: các ô input, dropdown, layout của form tạo/sửa dữ liệu).
+- view_definition: Định nghĩa cấu trúc bảng dữ liệu (ví dụ: danh sách các cột hiển thị, thứ tự cột, điều kiện lọc mặc định).
+- screen_definition: Bảng điều phối cấp cao nhất. Một "màn hình" (Screen) trong ERP thường bao gồm một hoặc nhiều Form và View được sắp xếp theo bố cục nhất định.
+
+5. Câu lệnh SQL tạo bảng
+
+CREATE TABLE entity_definition (
+    id UUID PRIMARY KEY,
+    entity_code VARCHAR(100) NOT NULL UNIQUE,
+    entity_name VARCHAR(255) NOT NULL,
+    entity_class VARCHAR(500) NOT NULL,
+    service_name VARCHAR(100) NOT NULL,
+    schema_name VARCHAR(100),
+    table_name VARCHAR(100) NOT NULL,
+    primary_key_field VARCHAR(100) NOT NULL DEFAULT 'id',
+    primary_key_type VARCHAR(50) NOT NULL DEFAULT 'UUID',
+    display_name_field VARCHAR(100),
+    soft_delete BOOLEAN DEFAULT TRUE,
+    tenant_enabled BOOLEAN DEFAULT FALSE,
+    auditable BOOLEAN DEFAULT TRUE,
+    cacheable BOOLEAN DEFAULT FALSE,
+    api_path VARCHAR(255),
+    description TEXT,
+    active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE field_definition (
+    id UUID PRIMARY KEY,
+    entity_code VARCHAR(100) NOT NULL,
+    field_name VARCHAR(100) NOT NULL,
+    field_label VARCHAR(255) NOT NULL,
+    data_type VARCHAR(50) NOT NULL,
+    required BOOLEAN DEFAULT FALSE,
+    unique_field BOOLEAN DEFAULT FALSE,
+    searchable BOOLEAN DEFAULT TRUE,
+    sortable BOOLEAN DEFAULT TRUE,
+    visible BOOLEAN DEFAULT TRUE,
+    display_order INTEGER DEFAULT 0,
+    description TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE entity_custom_field (
+    id UUID PRIMARY KEY,
+    entity_code VARCHAR(100) NOT NULL,
+    field_code VARCHAR(100) NOT NULL,
+    field_label VARCHAR(255) NOT NULL,
+    data_type VARCHAR(50) NOT NULL,
+    required BOOLEAN DEFAULT FALSE,
+    searchable BOOLEAN DEFAULT FALSE,
+    visible BOOLEAN DEFAULT TRUE,
+    default_value TEXT,
+    display_order INTEGER DEFAULT 0,
+    description TEXT,
+    active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+=====================================================================================================
+-- 1. Bảng định nghĩa Form nhập liệu
+CREATE TABLE form_definition (
+    id UUID PRIMARY KEY,
+    form_code VARCHAR(100) UNIQUE NOT NULL,
+    entity_id UUID NOT NULL, -- Liên kết với Entity (ví dụ: Đơn hàng, Nhân viên)
+    name VARCHAR(255) NOT NULL, -- Tên form
+    fields_config JSONB,        -- Cấu hình các trường: loại input, validation rules
+    layout_config JSONB,        -- Cấu hình bố cục: chia cột, chia tab
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 2. Bảng định nghĩa danh sách/View dữ liệu
+CREATE TABLE view_definition (
+    id UUID PRIMARY KEY,
+    view_code VARCHAR(100) UNIQUE NOT NULL,
+    entity_id UUID NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    columns_config JSONB,       -- Danh sách cột hiển thị, độ rộng, thứ tự
+    filter_config JSONB,        -- Điều kiện lọc mặc định (ví dụ: chỉ hiện đơn hàng chưa duyệt)
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 3. Bảng định nghĩa Screen (Màn hình tổng thể)
+CREATE TABLE screen_definition (
+    id UUID PRIMARY KEY,
+    screen_code VARCHAR(100) UNIQUE NOT NULL,
+    name VARCHAR(255) NOT NULL, -- Tên màn hình (ví dụ: Quản lý kho)
+    permission_code VARCHAR(100), -- Quyền truy cập màn hình
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
+
+-- 4. Bảng liên kết giữa Seens và Form, View là bảng screen_component
+CREATE TABLE screen_component
+(
+    id UUID PRIMARY KEY,
+    screen_id UUID NOT NULL,
+    component_type VARCHAR(50),
+    component_id UUID NOT NULL,
+    display_order INT,
+    region VARCHAR(100)
+);
+
+ScreenDefinition
+└── component
+        ├── viewId
+        └── formId
+GET screen
+↓
+components
+↓
+GET form
+↓
+GET view
+
+screen_id               component_type  component_id
+screen_employee         FORM            form_employee
+screen_employee         VIEW            view_employee
+
+screen_definition
+        |
+        |
+        v
++--------------------+
+| screen_component   |
++--------------------+
+| component_type     |
+| component_id       |
++---------+----------+
+          |
+          |
+   +------+-------------+
+   |                    |
+   |                    |
+   v                    v
+  FORM                 VIEW
+   |                    |
+   v                    v
+form_definition  view_definition
+
+
+==========================================================================================================================================================
+api
+├── schema
+│   ├── EntityController
+│   ├── FieldController
+│   └── CustomFieldController
+│
+└── ui
+    ├── FormController
+    ├── ViewController
+    ├── ScreenController
+    └── ScreenComponentController
+
+
+application
+├─── schema
+│       ├── command
+│       |    ├── EntityCommandService
+│       |    ├── FieldCommandService
+│       |    └── CustomFieldCommandService
+│       ├── query
+│       |    ├── EntityQueryService
+│       |    ├── FieldQueryService
+│       |    └── CustomFieldQueryService
+│       ├── dto
+│            ├── EntityDto.java
+│            ├── FieldDto.java
+│            ├── CustomFieldDto.java
+│   
+│    
+└── ui
+    ├── command
+    |    ├──FormCommandService.java
+    |    ├──ViewCommandService.java
+    |    ├──ScreenCommandService.java
+    |    ├──ScreenComponentCommandService.java
+    └── query
+    |    ├──FormQueryService.java
+    |    ├──ViewQueryService.java
+    |    ├──ScreenQueryService.java
+    |    ├──ScreenComponentQueryService
+    |
+    └── dto
+         ├── FormDto.java
+         ├── ViewDto.java
+         ├── ScreenDto.java
+         ├── ScreenComponentDto.java
+     
+
+domain
+│
+├── schema
+│   ├── aggregate
+│   ├── model
+|   |   |--EntityCustomField.java
+|   |   |--EntityDefinition.java
+|   |   |--FieldDefinition.java    
+│   ├── repository
+|   |   |--CustomFieldRepository.java
+|   |   |--EntityRepository.java
+|   |   |--FieldRepository.java      
+│   ├── service
+│   └── event
+│
+└── ui
+    ├── aggregate
+    ├── model
+    |   |--FormDefinition.java
+    |   |--ScreenDefinition.java    
+    |   |--ScreenComponent.java 
+    |   |--ViewDefinition.java   
+    ├── repository
+    |   |--FormRepository.java
+    |   |--ScreenComponentRepository.java
+    |   |--ScreenRepository.java
+    |   |--ViewRepository.java
+    ├── service
+    └── event
+
+
+infrastructure
+    │
+    ├── adapter
+    │   ├── jpa
+    │   │   ├── EntityRepositoryImpl.java
+    │   │   ├── FieldRepositoryImpl.java
+    │   │   ├── CustomFieldRepositoryImpl.java
+    │   │   ├── FormRepositoryImpl.java
+    │   │   ├── ViewRepositoryImpl.java
+    │   │   ├── ScreenRepositoryImpl.java
+    │   │   └── ScreenComponentRepositoryImpl.java
+    │   │
+    │   ├── kafka
+    │   ├── search
+    │   ├── ai
+    │   ├── storage
+    │
+    ├── datasource
+    │   ├── entity
+    |   |   |--CustomFieldJpaEntity.java
+    |   |   |--EntityDefinitionJpaEntity.java
+    |   |   |--FieldDefinitionJpaEntity.java
+    |   |   |--FormDefinitionJpaEntity.java
+    |   |   |--ScreenComponentJpaEntity.java
+    |   |   |--ScreenDefinitionJpaEntity.java
+    |   |   |--ViewDefinitionJpaEntity.java
+    │   ├── repository
+    |   |   |--CustomFieldJpaRepository.java
+    |   |   |--EntityDefinitionJpaRepository.java
+    |   |   |--FieldDefinitionJpaRepository.java
+    |   |   |--FormDefinitionJpaRepository.java
+    |   |   |--ScreenComponentJpaRepository.java
+    |   |   |--ScreenDefinitionJpaRepository.java
+    |   |   |--ViewDefinitionJpaRepository.java
+    │   └── converter
+    |   |   |--JsonMapConverter.java
+    |   |── mapper
+    |       |--CustomFieldMapper.java
+    |       |--FieldMapper.java
+    |       |--EntityMapper.java
+    |       |--FormMapper.java
+    |       |--ScreenMapper.java
+    |       |--ViewMapper.java
+    │
+    └── config
+        ├── DatabaseProperties.java
+        ├── KafkaProperties.java
+        ├── SearchProperties.java
+        ├── AiProperties.java
+        ├── StorageProperties.java
+        ├── JpaConfig.java
+        └── InfrastructureConfig.java
+
+
+
+=======================================================================================================================================================
+SCREEM COMPONENTS:
+GET    /api/metadata/screen-components
+GET    /api/metadata/screen-components/{id}
+GET    /api/metadata/screen-components/screen/{screenId}
+POST   /api/metadata/screen-components
+PUT    /api/metadata/screen-components/{id}
+DELETE /api/metadata/screen-components/{id}
+
