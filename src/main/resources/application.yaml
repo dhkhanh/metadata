@@ -1,0 +1,18 @@
+spring:
+  application:
+    name: be.metadata
+  datasource:
+    url: jdbc:postgresql://103.74.121.154:5433/ebiz.metadata
+    username: admin
+    password: 123456a@A
+    driver-class-name: org.postgresql.Driver
+
+    jpa:
+      hibernate:
+        ddl-auto: update
+      show-sql: true
+      properties:
+        hibernate:
+          format_sql: true
+
+      open-in-view: false
